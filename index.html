@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merry Christmas!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Quicksand:wght@500&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Quicksand', sans-serif; }
+        
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #fff; text-align: center; pointer-events: none;
+        }
+
+        #start-btn {
+            pointer-events: auto; padding: 20px 40px; font-size: 22px;
+            background: #e74c3c; 
+            color: white; border: 2px solid white; border-radius: 50px;
+            cursor: pointer; font-family: 'Dancing Script', cursive;
+            transition: 0.3s; box-shadow: 0 0 20px rgba(231, 76, 60, 0.6);
+            animation: pulse 1.5s infinite;
+        }
+        #start-btn:hover { transform: scale(1.1); background: #c0392b; }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        #message-box { opacity: 0; transition: opacity 2s ease-in-out; text-shadow: 0 4px 10px rgba(0,0,0,0.9); }
+
+        h1.main-title {
+            font-family: 'Dancing Script', cursive; font-size: 5rem; margin: 0; color: #ff6b6b;
+            animation: floatText 3s ease-in-out infinite;
+        }
+
+        p.sub-message { font-size: 1.5rem; margin-top: 15px; line-height: 1.5; color: #fff; font-weight: bold;}
+
+        @keyframes floatText { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+
+        /* Snow particles */
+        .snow { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.5);
+            animation: snow 10s linear infinite; 
+        }
+
+        @keyframes snow {
+            to { transform: translateY(100vh); }
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" loop>
+        <source src="nhac.mp3" type="audio/mpeg">
+    </audio>
+
+    <div class="snow"></div> <!-- Snow overlay -->
+
+    <div id="canvas-container"></div>
+
+    <div id="overlay">
+        <button id="start-btn">🎄 Mở quà đi bạn nhỏ ơi! 🎁</button>
+        
+        <div id="message-box">
+            <h1 class="main-title">Merry Christmas! 🎅</h1>
+            <p class="sub-message">
+                Chúc bà một mùa Giáng sinh siêu ấm áp,<br>
+                Ăn nhiều không béo và luôn xinh đẹp rạng ngời nhé! ❄️
+            </p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+
+    <script>
+        const myImagesList = [
+            'anh1.jpg', 'anh2.jpg', 'anh3.jpg', 'anh4.jpg', 
+            'anh5.jpg', 'anh6.jpg', 'anh7.jpg', 'anh8.jpg', 
+            'anh9.jpg', 'anh10.jpg', 'anh11.jpg', 'anh12.jpg',
+        ];
+
+        let scene, camera, renderer, particles, clock;
+        let floatingFrames = [];
+        let isRunning = false;
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050a14); 
+            scene.fog = new THREE.FogExp2(0x050a14, 0.001);
+
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 2000);
+            camera.position.set(0, 40, 550); 
+            camera.lookAt(0, 40, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            
+            const spotLight = new THREE.SpotLight(0xffaa00, 1);
+            spotLight.position.set(100, 200, 100);
+            spotLight.castShadow = true;
+            scene.add(spotLight);
+
+            const groundGeo = new THREE.PlaneGeometry(2000, 2000);
+            const groundMat = new THREE.MeshBasicMaterial({ color: 0x050a14 }); 
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -60; 
+            scene.add(ground);
+
+            createSnow();
+            loadUserPhotos();
+
+            clock = new THREE.Clock();
+            window.addEventListener('resize', onWindowResize);
+            document.getElementById('start-btn').addEventListener('click', startExperience);
+            animate();
+        }
+
+        function createSnow() {
+            const count = 2000; // Increase snow particles
+            const geo = new THREE.BufferGeometry();
+            const pos = [];
+            const vel = [];
+            for (let i = 0; i < count; i++) {
+                pos.push((Math.random()-0.5)*1200, Math.random()*600, (Math.random()-0.5)*800);
+                vel.push(0, -Math.random() * 0.5 - 0.2, 0);
+            }
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            geo.userData.vel = vel;
+            const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 2.5, transparent: true, opacity: 0.9 });
+            particles = new THREE.Points(geo, mat);
+            scene.add(particles);
+        }
+
+        function loadUserPhotos() {
+            const loader = new THREE.TextureLoader();
+            const boxGeo = new THREE.BoxGeometry(180, 240, 2); 
+
+            myImagesList.forEach(url => {
+                loader.load(url, (tex) => {
+                    const matImg = new THREE.MeshBasicMaterial({ map: tex });
+                    const matFrame = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+                    const mesh = new THREE.Mesh(boxGeo, [matFrame, matFrame, matFrame, matFrame, matImg, matFrame]);
+                    
+                    mesh.position.set(0, -300, 0); 
+                    mesh.scale.set(0.1, 0.1, 0.1); 
+                    
+                    mesh.userData = { message: "Happy Holidays! 🎉" }; // Example interaction message
+                    
+                    scene.add(mesh);
+                    floatingFrames.push(mesh);
+
+                    // Add click event for interaction
+                    mesh.callback = function() {
+                        alert(mesh.userData.message);
+                    };
+                }, undefined, () => { console.log(`Lỗi ảnh: ${url}`); });
+            });
+        }
+
+        function startExperience() {
+            if (isRunning) return;
+            isRunning = true;
+            const audio = document.getElementById("bg-music");
+            audio.volume = 0.9;
+            audio.currentTime = 50; 
+            audio.play().catch(() => alert("Click again to hear the music!"));
+
+            const btn = document.getElementById('start-btn');
+            btn.style.opacity = 0;
+            setTimeout(() => btn.style.display = 'none', 500);
+            document.getElementById('message-box').style.opacity = 1;
+
+            setTimeout(() => {
+                setInterval(jumpRandomPhoto, 3000); 
+            }, 500);
+        }
+
+        function jumpRandomPhoto() {
+            if (floatingFrames.length === 0) return;
+            
+            const frame = floatingFrames[Math.floor(Math.random() * floatingFrames.length)];
+
+            if (gsap.isTweening(frame.position)) return;
+
+            const newX = (Math.random() - 0.5) * 800; 
+            const newZ = (Math.random() - 0.5) * 300; 
+
+            frame.position.set(newX, -200, newZ); 
+            frame.rotation.set(0, Math.random() * Math.PI, 0); 
+            frame.scale.set(0.1, 0.1, 0.1);
+
+            const jumpHeight = 50 + Math.random() * 100; 
+            const duration = 6 + Math.random() * 2; 
+
+            const tl = gsap.timeline();
+            tl.to(frame.position, {
+                y: jumpHeight,
+                duration: duration / 2,
+                ease: "power2.out"
+            }, 0);
+            
+            tl.to(frame.scale, {
+                x: 1.5, y: 1.5, z: 1.5, 
+                duration: duration / 2.5,
+                ease: "back.out(1.2)"
+            }, 0);
+
+            tl.to(frame.rotation, {
+                y: frame.rotation.y + Math.PI * 2,
+                z: (Math.random() - 0.5) * 0.5,
+                duration: duration,
+                ease: "power1.inOut"
+            }, 0);
+            
+            tl.to(frame.position, {
+                y: -300, 
+                duration: duration / 2,
+                ease: "power2.in",
+                delay: 0.2
+            }, ">");
+
+            tl.to(frame.scale, {
+                x: 0.1, y: 0.1, z: 0.1,
+                duration: duration / 2,
+                ease: "power2.in"
+            }, "<");
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            
+            if (particles) {
+                const pos = particles.geometry.attributes.position.array;
+                const vel = particles.geometry.userData.vel;
+                for (let i = 0; i < pos.length; i+=3) {
+                    pos[i+1] += vel[i+1];
+                    pos[i] += Math.sin(clock.elapsedTime * 0.5) * 0.2; 
+                    
+                    if (pos[i+1] < -200) { 
+                        pos[i+1] = 400; 
+                    }
+                }
+                particles.geometry.attributes.position.needsUpdate = true;
+            }
+            renderer.render(scene, camera);
+        }
+        init();
+    </script>
+</body>
+</html>
